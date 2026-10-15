@@ -121,6 +121,18 @@ function formatDateTime(timestamp: number): string {
   });
 }
 
+// Mirrors the backend's fallback filename (extract_title / sanitize_filename in lib.rs)
+// for notes without an H1, plus the "-N" suffix added on collisions.
+const UNNAMED_NOTE_PATTERN = /^Untitled(-\d+)?$/;
+
+function splitNotePath(path: string): { dir: string; name: string } {
+  const slash = path.lastIndexOf("/");
+  return {
+    dir: slash >= 0 ? path.slice(0, slash + 1) : "",
+    name: path.slice(slash + 1).replace(/\.md$/i, ""),
+  };
+}
+
 function focusAndSelectTitle(editor: TiptapEditor): boolean {
   let titleFrom = -1;
   let titleTo = -1;
@@ -2257,9 +2269,37 @@ export function Editor({
               <PanelLeftIcon className="w-4.5 h-4.5 stroke-[1.5]" />
             </IconButton>
           )}
-          <span className="text-xs text-text-muted mb-px truncate">
-            {formatDateTime(currentNote.modified)}
-          </span>
+          {(() => {
+            const { dir, name } = splitNotePath(currentNote.id);
+            const modified = formatDateTime(currentNote.modified);
+            // Files opened directly always have a real name on disk
+            if (!previewMode && UNNAMED_NOTE_PATTERN.test(name)) {
+              return (
+                <span className="text-xs text-text-muted mb-px truncate">
+                  {modified}
+                </span>
+              );
+            }
+            return (
+              <span
+                className="flex items-baseline min-w-0 text-xs mb-px"
+                title={`${currentNote.id}\nModified ${modified}`}
+              >
+                {dir && (
+                  // RTL so long paths lose their start, keeping the parent folder visible
+                  <span
+                    dir="rtl"
+                    className="text-text-muted/60 truncate text-left"
+                  >
+                    <bdi dir="ltr">{dir}</bdi>
+                  </span>
+                )}
+                <span className="text-text font-medium truncate shrink-0 max-w-full">
+                  {name}
+                </span>
+              </span>
+            );
+          })()}
         </div>
         <div
           className={`titlebar-no-drag flex items-center gap-px shrink-0 transition-opacity duration-400 ${needsSidebarDelay ? "delay-200" : ""} ${focusMode ? "opacity-0 pointer-events-none" : "opacity-100"}`}
